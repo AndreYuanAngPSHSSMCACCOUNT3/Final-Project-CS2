@@ -5,3 +5,4 @@ Added Features:
 [ Feature 1 - Display Patients, Their ID, and Times Visited
   Feature 2 - Display the doctors consulted by each patient
   Feature 3 - Display the patient who visits the most]
+NOTE: I researched a bit on how to display if firebase is connected or not
