@@ -1,0 +1,111 @@
+BEGIN PROGRAM
+
+SET FILE_NAME <- "hospital.json"
+
+FUNCTION LoadPatientsForCRUD()
+IF FILE_NAME exists THEN
+READ data from FILE_NAME
+IF data is a LIST THEN
+CONVERT list to DICTIONARY (Key: patient_id)
+END IF
+RETURN dictionary
+ELSE
+RETURN empty dictionary
+END IF
+END FUNCTION
+
+FUNCTION SavePatients(PatientData)
+OPEN FILE_NAME for writing
+CONVERT PatientData values to a LIST
+WRITE list to FILE_NAME
+
+IF Firebase is initialized THEN
+  FOR EACH record IN PatientData
+    TRY
+      SET Firestore document USING patient_id
+      UPDATE document with patient_data
+    CATCH Exception
+      PRINT "Cloud sync error"
+  END FOR
+END IF
+END FUNCTION
+
+PROCEDURE CalculateGlobalStats()
+LOAD patients from disk
+INITIALIZE DoctorList, DiagnosisList, Summaries
+
+FOR EACH patient IN data DO
+  SET VisitCount <- Length of patient's visits
+  FOR EACH visit IN visits DO
+    ADD visit.doctor to DoctorList
+    ADD visit.diagnosis to DiagnosisList
+  END FOR
+  APPEND data to Summaries list
+END FOR
+
+SET TopDoctor <- Mode of MasterDoctorList
+SET AvgVisits <- TotalVisits / UniqueDoctorCount
+SET TopDiagnosis <- Mode of MasterDiagnosisList
+END PROCEDURE
+
+FUNCTION RunSummaryMenu (Summaries, Stats)
+WHILE True DO
+DISPLAY Summary Options (1-7)
+READ UserChoice
+
+  CASE UserChoice OF
+    "1": PRINT All patient names, visit counts, and doctors
+    "2": PRINT doctors in patient
+    "3": FIND patient in Summaries where VisitCount is MAX and PRINT
+    "4": PRINT Stats.TopDoctor
+    "5": PRINT Stats.AvgVisits
+    "6": PRINT Stats.TopDiagnosis
+    "7": RETURN to Database Menu
+  END CASE
+END WHILE
+END FUNCTION
+
+FUNCTION RunPatientDatabaseMenu()
+WHILE True DO
+DISPLAY Database Options (1. Display, 2. Add, 3. Update, 4. Delete, 5. Features, 6. Exit)
+READ Choice
+
+  IF Choice IS "1" THEN
+    SET current_patients <- LoadPatientsForCRUD()
+    FOR EACH p IN current_patients: PRINT p.id, p.name, p.visit_total
+  
+  ELSE IF Choice IS "2" THEN
+    READ NewID, NewName
+    IF NewID exists THEN PRINT "Error"
+    ELSE CREATE NewPatientObject
+      IF user wants visit THEN ADD visit details to object
+      ADD NewPatientObject to dictionary
+      CALL SavePatients(dictionary)
+    END IF
+
+  ELSE IF Choice IS "3" THEN
+    READ TargetID
+    IF TargetID exists THEN
+      READ NewVisitDetails (Doctor, Diagnosis, Date)
+      APPEND NewVisitDetails to patient's visit list
+      CALL SavePatients(dictionary)
+    END IF
+
+  ELSE IF Choice IS "4" THEN
+    READ DeleteID
+    REMOVE DeleteID from dictionary
+    CALL SavePatients(dictionary)
+
+  ELSE IF Choice IS "5" THEN
+    CALL CalculateGlobalStats()
+    CALL RunSummaryMenu()
+
+  ELSE IF Choice IS "6" THEN
+    EXIT PROGRAM
+  END IF
+END WHILE
+END FUNCTION
+
+CALL RunPatientDatabaseMenu()
+
+END PROGRAM
